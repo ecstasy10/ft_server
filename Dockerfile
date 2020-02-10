@@ -1,19 +1,53 @@
 FROM debian:buster
 
-# UPDATE
-RUN apt-get update
-RUN apt-get upgrade -y
+ENV USERNAME	'admin'
+ENV PASSWORD	'admin'
 
-# INSTALL NGINX
-RUN apt-get -y install nginx
+# Utility
+RUN apt-get update; \
+	apt-get install -y nginx wget procps psmisc debconf debconf-utils perl lsb-release gnupg
 
-# COPY CONTENT
-COPY ./srcs/start.sh /var/
-COPY ./srcs/nginx.conf /etc/nginx/sites-available/localhost
-RUN ln -s /etc/nginx/sites-available/localhost /etc/nginx/sites-enabled/localhost
+# Add MySQL PPA
+RUN wget -q http://repo.mysql.com/mysql-apt-config_0.8.9-1_all.deb; \
+	export DEBIAN_FRONTEND=noninteractive && dpkg -i mysql-apt-config*; \
+	apt-key adv --keyserver keys.gnupg.net --recv-keys 8C718D3B5072E1F5; \
+	apt-get update; \
+	apt-get install --no-install-recommends --no-install-suggests -y ca-certificates libssl1.1
 
+# Install PHP + NGINX
+RUN echo "mysql-server-5.7 mysql-server/root_password password $PASSWORD" | debconf-set-selections; \
+	echo "mysql-server-5.7 mysql-server/root_password_again password $PASSWORD" | debconf-set-selections; \
+	DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends --no-install-suggests -y \
+	php php-cgi php-mysqli php-pear php-mbstring php-gettext \
+	php-common php-phpseclib php-mysql php-fpm unzip mysql-server
 
-# START SERVER
-CMD bash /var/start.sh
+# Unzip Wordpress and PhpMyAdmin
+RUN mkdir -p /var/www/html
+COPY srcs/phpmyadmin.zip /var/www/html
+COPY srcs/wordpress.zip /var/www/html
+RUN unzip -q /var/www/html/phpmyadmin.zip -d /var/www/html; \
+	unzip -q /var/www/html/wordpress.zip -d /var/www/html; \
+	chown -R www-data:www-data /var/www/html/wordpress
 
-EXPOSE 80
+# NGINX configuration
+COPY srcs/www.conf /etc/php/7.3/fpm/pool.d/
+COPY srcs/index.html /var/www/html
+COPY srcs/default /etc/nginx/sites-available/
+
+# SSL
+RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+	-subj '/C=ESP/ST=75/L=Madrid/O=42Madrid/CN=dbalboa-' \
+	-keyout /etc/ssl/certs/localhost.key -out /etc/ssl/certs/localhost.crt
+
+# Start
+CMD	service mysql start; \
+	service nginx start; \
+	service php7.3-fpm start; \
+	mysql -u root -p$PASSWORD -e "CREATE USER '$USERNAME'@'localhost' identified by '$PASSWORD';" ;\
+	mysql -u root -p$PASSWORD -e "CREATE DATABASE wordpress;"; \
+	mysql -u root -p$PASSWORD -e "GRANT ALL PRIVILEGES ON wordpress.* TO '$USERNAME'@'localhost';" ;\
+	mysql -u root -p$PASSWORD -e "FLUSH PRIVILEGES;" ;\
+	sleep infinity & wait
+
+# Expose the ports
+EXPOSE 80 443
