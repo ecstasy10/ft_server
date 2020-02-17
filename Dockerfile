@@ -1,53 +1,47 @@
 FROM debian:buster
 
-ENV USERNAME	'admin'
-ENV PASSWORD	'admin'
+# UPDATE
+RUN apt-get update
+RUN apt-get upgrade -y
 
-# Utility
-RUN apt-get update; \
-	apt-get install -y nginx wget procps psmisc debconf debconf-utils perl lsb-release gnupg
+# INSTALL NGINX
+RUN apt-get -y install nginx
 
-# Add MySQL PPA
-RUN wget -q http://repo.mysql.com/mysql-apt-config_0.8.9-1_all.deb; \
-	export DEBIAN_FRONTEND=noninteractive && dpkg -i mysql-apt-config*; \
-	apt-key adv --keyserver keys.gnupg.net --recv-keys 8C718D3B5072E1F5; \
-	apt-get update; \
-	apt-get install --no-install-recommends --no-install-suggests -y ca-certificates libssl1.1
+# INSTALL MYSQL
+RUN apt-get -y install mariadb-server
 
-# Install PHP + NGINX
-RUN echo "mysql-server-5.7 mysql-server/root_password password $PASSWORD" | debconf-set-selections; \
-	echo "mysql-server-5.7 mysql-server/root_password_again password $PASSWORD" | debconf-set-selections; \
-	DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends --no-install-suggests -y \
-	php php-cgi php-mysqli php-pear php-mbstring php-gettext \
-	php-common php-phpseclib php-mysql php-fpm unzip mysql-server
+# INSTALL PHP
+RUN apt-get -y install php7.3 php-mysql php-fpm php-cli php-mbstring
 
-# Unzip Wordpress and PhpMyAdmin
-RUN mkdir -p /var/www/html
-COPY srcs/phpmyadmin.zip /var/www/html
-COPY srcs/wordpress.zip /var/www/html
-RUN unzip -q /var/www/html/phpmyadmin.zip -d /var/www/html; \
-	unzip -q /var/www/html/wordpress.zip -d /var/www/html; \
-	chown -R www-data:www-data /var/www/html/wordpress
+# INSTALL TOOLS
+RUN apt-get -y install wget
 
-# NGINX configuration
-COPY srcs/www.conf /etc/php/7.3/fpm/pool.d/
-COPY srcs/index.html /var/www/html
-COPY srcs/default /etc/nginx/sites-available/
+# COPY CONTENT
+COPY ./srcs/start.sh /var/
+COPY ./srcs/mysql_setup.sql /var/
+COPY ./srcs/wordpress.sql /var/
+COPY ./srcs/wordpress.tar.gz /var/www/html/
+COPY ./srcs/nginx.conf /etc/nginx/sites-available/localhost
+RUN ln -s /etc/nginx/sites-available/localhost /etc/nginx/sites-enabled/localhost
 
-# SSL
-RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-	-subj '/C=ESP/ST=75/L=Madrid/O=42Madrid/CN=dbalboa-' \
-	-keyout /etc/ssl/certs/localhost.key -out /etc/ssl/certs/localhost.crt
+# INSTALL PHPMYADMIN
+WORKDIR /var/www/html/
+RUN wget https://files.phpmyadmin.net/phpMyAdmin/5.0.1/phpMyAdmin-5.0.1-english.tar.gz
+RUN tar xf phpMyAdmin-5.0.1-english.tar.gz && rm -rf phpMyAdmin-5.0.1-english.tar.gz
+RUN mv phpMyAdmin-5.0.1-english phpmyadmin
+COPY ./srcs/config.inc.php phpmyadmin
 
-# Start
-CMD	service mysql start; \
-	service nginx start; \
-	service php7.3-fpm start; \
-	mysql -u root -p$PASSWORD -e "CREATE USER '$USERNAME'@'localhost' identified by '$PASSWORD';" ;\
-	mysql -u root -p$PASSWORD -e "CREATE DATABASE wordpress;"; \
-	mysql -u root -p$PASSWORD -e "GRANT ALL PRIVILEGES ON wordpress.* TO '$USERNAME'@'localhost';" ;\
-	mysql -u root -p$PASSWORD -e "FLUSH PRIVILEGES;" ;\
-	sleep infinity & wait
+# INSTALL WORDPRESS
+RUN tar xf ./wordpress.tar.gz && rm -rf wordpress.tar.gz
+RUN chmod 755 -R wordpress
 
-# Expose the ports
+# SETUP SERVER
+RUN service mysql start && mysql -u root mysql < /var/mysql_setup.sql && mysql wordpress -u root --password= < /var/wordpress.sql
+RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 -subj '/C=ES/ST=Madrid/L=Madrid/O=42Madrid/CN=hbarrius' -keyout /etc/ssl/certs/localhost.key -out /etc/ssl/certs/localhost.crt
+RUN chown -R www-data:www-data *
+RUN chmod 755 -R *
+
+# START SERVER
+CMD bash /var/start.sh
+
 EXPOSE 80 443
