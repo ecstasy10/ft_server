@@ -1,4 +1,7 @@
 # ft_server
+
+<img src="https://github.com/itsnotLonee/ft_server/blob/master/srcs/img/screenshot.png">
+
 ## Description
   - You must set up a web server with Nginx, in only one docker container. The
 container OS must be debian buster.
