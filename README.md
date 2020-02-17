@@ -1,10 +1,11 @@
 # ft_server
-
 ## Description
 
-soy hector y soy un subnormal
+42Madrid project, we need a Dockerfile on the root of our repo, no docker-compose allowed. It will deploy 3 services, Wordpress, PhpMyAdmin and MySQL.
 
-PD: con cariño david
+Should work with SSL.
+
+We need an index that can be disabled.
 
 ## Usage
 
