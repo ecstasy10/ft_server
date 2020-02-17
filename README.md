@@ -1,11 +1,19 @@
 # ft_server
 ## Description
+  - You must set up a web server with Nginx, in only one docker container. The
+container OS must be debian buster.
+  - Your web server must be able to run several services at the same time. The services
+will be a WordPress website, phpMyAdmin and MySQL. You will need to make
+sure your SQL database works with the WordPress and phpMyAdmin.
+  - Your server should be able to use the SSL protocol.
+  - You will have to make sure that, depending on the url, your server redirects to the
+correct website.
+  - You will also need to make sure your server is running with an index that must be
+able to be disabled.
 
-42Madrid project, we need a Dockerfile on the root of our repo, no docker-compose allowed. It will deploy 3 services, Wordpress, PhpMyAdmin and MySQL.
+## Custom
 
-Should work with SSL.
-
-We need an index that can be disabled.
+Bootstrap used for the style of my index.
 
 ## Usage
 
@@ -18,4 +26,3 @@ docker run -it -p 80:80 -p 443:443 ft_server
 ```
 * SSL auto-certificate is created
 * MySQL is automatically created
-* Wordpress is automatically setup
