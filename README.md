@@ -1,5 +1,4 @@
 # ft_server
-
 ## Description
 
 42Madrid project, we need a Dockerfile on the root of our repo, no docker-compose allowed. It will deploy 3 services, Wordpress, PhpMyAdmin and MySQL.
